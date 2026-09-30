@@ -32,11 +32,28 @@ export async function POST(request) {
   const assets = listAssetsByProject(project_id);
   const verifications = listVerificationsByProject(project_id);
 
+  const parseJsonArray = (value) => {
+    try {
+      const parsed = JSON.parse(value || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const verdictCounts = verifications.reduce((counts, verification) => {
+    counts[verification.verdict] = (counts[verification.verdict] || 0) + 1;
+    return counts;
+  }, {});
+
   const assetSummary = {
     total_assets: assets.length,
     before_count: assets.filter((a) => a.phase === 'before').length,
     after_count: assets.filter((a) => a.phase === 'after').length,
-    all_tags: [...new Set(assets.flatMap((a) => JSON.parse(a.tags || '[]')))]
+    paired_count: new Set(assets.filter((a) => a.pair_id).map((a) => a.pair_id)).size,
+    all_tags: [...new Set(assets.flatMap((a) => parseJsonArray(a.tags)))],
+    verification_count: verifications.length,
+    verdict_counts: verdictCounts
   };
 
   let markdown;
