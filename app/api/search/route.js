@@ -33,25 +33,39 @@ export async function POST(request) {
   }
 
   const assets = listAssetsByProject(project_id);
-  const keywords = filters.keywords.map((k) => k.toLowerCase());
+  const keywords = Array.isArray(filters.keywords)
+    ? filters.keywords.filter(Boolean).map((keyword) => keyword.toLowerCase().trim())
+    : [];
 
-  const matches = assets.filter((a) => {
-    if (filters.phase && a.phase !== filters.phase) return false;
-    if (keywords.length === 0) return true;
+  const results = assets
+    .flatMap((asset) => {
+      let tags = [];
+      let detectedObjects = [];
+      try {
+        tags = JSON.parse(asset.tags || '[]');
+        detectedObjects = JSON.parse(asset.detected_objects || '[]');
+      } catch {
+        return [];
+      }
 
-    const tags = JSON.parse(a.tags || '[]').map((t) => t.toLowerCase());
-    const categories = JSON.parse(a.detected_objects || '[]').map((d) => (d.category || '').toLowerCase());
-    const haystack = [...tags, ...categories, a.phase, a.pair_id || ''].join(' ');
+      if (filters.phase && asset.phase !== filters.phase) return [];
+      const searchable = [
+        ...tags,
+        ...detectedObjects.map((object) => object.category || ''),
+        asset.phase,
+        asset.pair_id || ''
+      ].join(' ').toLowerCase();
+      const matchedKeywords = keywords.filter((keyword) => searchable.includes(keyword));
+      if (keywords.length > 0 && matchedKeywords.length === 0) return [];
 
-    return keywords.some((k) => haystack.includes(k));
-  });
+      return [{
+        ...asset,
+        tags,
+        detected_objects: detectedObjects,
+        relevance: keywords.length ? matchedKeywords.length / keywords.length : 1
+      }];
+    })
+    .sort((a, b) => b.relevance - a.relevance || a.uploaded_at.localeCompare(b.uploaded_at));
 
-  return NextResponse.json({
-    filters,
-    results: matches.map((a) => ({
-      ...a,
-      tags: JSON.parse(a.tags || '[]'),
-      detected_objects: JSON.parse(a.detected_objects || '[]')
-    }))
-  });
+  return NextResponse.json({ filters, results });
 }
