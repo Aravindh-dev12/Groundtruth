@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import UploadZone from '../../../components/UploadZone';
 import Gallery from '../../../components/Gallery';
@@ -12,7 +11,6 @@ import ProvenanceLedger from '../../../components/ProvenanceLedger';
 
 export default function ProjectWorkspace({ params }) {
   const { id } = params;
-  const router = useRouter();
   const [data, setData] = useState(null);
   const [ledgerKey, setLedgerKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
@@ -22,10 +20,6 @@ export default function ProjectWorkspace({ params }) {
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/projects/${id}`);
-    if (res.status === 401) {
-      router.push('/login');
-      return;
-    }
     if (res.ok) setData(await res.json());
   }, [id, router]);
 
